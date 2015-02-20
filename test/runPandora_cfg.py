@@ -101,10 +101,10 @@ process.trackingParticleRecoTrackAsssociation = cms.EDProducer(
     )
 
 process.pandorapfanew = cms.EDProducer('PandoraCMSPFCandProducer',
-    debugPrint = cms.bool(False), #for cout statements
-    debugHisto = cms.bool(False), #for diagnostic/calibration histograms
+    debugPrint = cms.bool(True), #for cout statements
+    debugHisto = cms.bool(True), #for diagnostic/calibration histograms
     HGCrechitCollection  = cms.InputTag("particleFlowRecHitHGCEE",""), 
-    generaltracks = cms.InputTag("HGCalTrackCollection","TracksInHGCal"),
+    generaltracks = cms.InputTag("pfTrack"), #was ("HGCalTrackCollection","TracksInHGCal")
     tPRecoTrackAsssociation= cms.InputTag("trackingParticleRecoTrackAsssociation"),
     genParticles= cms.InputTag("genParticles"),
 #    inputconfigfile = cms.string('PandoraSettingsDefault_WithoutMonitoring.xml'),
@@ -145,7 +145,8 @@ process.FEVTDEBUGHLToutput = cms.OutputModule("PoolOutputModule",
 )
 process.FEVTDEBUGHLToutput.outputCommands.append('keep *_pandorapfanew_*_*')
 
-process.reconstruction_step = cms.Path(process.trackerIntFilter*
+process.reconstruction_step = cms.Path(
+                                       #process.trackerIntFilter*
                                        process.particleFlowRecHitHGCEE*
                                        process.pfTrack*
                                        process.HGCalTrackCollection*

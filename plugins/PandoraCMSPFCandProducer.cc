@@ -44,6 +44,7 @@
 #include "DataFormats/TrajectorySeed/interface/PropagationDirection.h"
 #include "TrackingTools/TrajectoryState/interface/TrajectoryStateTransform.h"
 #include "TrackingTools/MaterialEffects/interface/PropagatorWithMaterial.h"
+#include "FastSimulation/BaseParticlePropagator/interface/BaseParticlePropagator.h"
 
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidateFwd.h"
 #include "DataFormats/ParticleFlowCandidate/interface/PFCandidate.h"
@@ -776,14 +777,27 @@ void PandoraCMSPFCandProducer::prepareTrack(edm::Event& iEvent){ // function to 
 
     //For the ECAL entrance
     // Starting from outermost hit position of the track and propagating to ECAL Entrance
-
+    double pfoutenergy = track->outerMomentum().Mag2();
+    //the input BaseParticlePropagator needs to be cm and GeV
+    BaseParticlePropagator theOutParticle = BaseParticlePropagator( RawParticle(XYZTLorentzVector(track->outerMomentum().x(),
+                                                                                                  track->outerMomentum().y(),
+                                                                                                  track->outerMomentum().z(),
+                                                                                                  pfoutenergy),
+                                                                                XYZTLorentzVector(track->outerPosition().x(),
+                                                                                                  track->outerPosition().y(),
+                                                                                                  track->outerPosition().z(),
+                                                                                                  0.)),
+                                                                    0.,0.,B_.z());
+    theOutParticle.setCharge(track->charge());
+	
     const TrajectoryStateOnSurface myTSOS = trajectoryStateTransform::outerStateOnSurface(*track, *(tkGeom.product()), magneticField.product());
     if(debugPrint) {
       std::cout << "magnetic field z " << B_.z() << std::endl;
       std::cout << "theOutParticle x position before propagation in cm "<< myTSOS.globalPosition().x()<< std::endl;
       std::cout << "theOutParticle x momentum before propagation in cm "<< myTSOS.globalMomentum().x()<< std::endl;
     }
-
+	
+	theOutParticle.propagateToEcalEntrance(false);
     const auto& layer( (myTSOS.globalPosition().z() > 0 ? _plusSurface[0] : _minusSurface[0]) );
     //std::cout << "BoundDisk inner radius = " << layer->innerRadius() << ", outer radius = " << layer->outerRadius() << std::endl;
     TrajectoryStateOnSurface piStateAtSurface = _mat_prop->propagate(myTSOS, *layer);
@@ -804,6 +818,35 @@ void PandoraCMSPFCandProducer::prepareTrack(edm::Event& iEvent){ // function to 
                  +piStateAtSurface.globalMomentum().y()*piStateAtSurface.globalMomentum().y()
                  +piStateAtSurface.globalMomentum().z()*piStateAtSurface.globalMomentum().z()));
     }
+	
+	//ntuple for testing propagators
+	if(debugHisto){
+      t_trackX = track->outerPosition().x();
+      t_trackY = track->outerPosition().y();
+      t_trackZ = track->outerPosition().z();
+      t_trackPX = track->outerMomentum().x();
+      t_trackPY = track->outerMomentum().y();
+      t_trackPZ = track->outerMomentum().z();
+      t_trackP = pfoutenergy;
+      t_propnew = piStateAtSurface.isValid();
+      t_propnewX  = t_propnew ? piStateAtSurface.globalPosition().x() : 0.0 ;
+      t_propnewY  = t_propnew ? piStateAtSurface.globalPosition().y() : 0.0 ;
+      t_propnewZ  = t_propnew ? piStateAtSurface.globalPosition().z() : 0.0 ;
+      t_propnewPX = t_propnew ? piStateAtSurface.globalMomentum().x() : 0.0 ;
+      t_propnewPY = t_propnew ? piStateAtSurface.globalMomentum().y() : 0.0 ;
+      t_propnewPZ = t_propnew ? piStateAtSurface.globalMomentum().z() : 0.0 ;
+      t_propnewP  = t_propnew ? sqrt(t_propnewPX*t_propnewPX + t_propnewPY*t_propnewPY + t_propnewPZ*t_propnewPZ) : 0.0 ;
+      t_propold = theOutParticle.getSuccess()!=0;
+      t_propold_endcap = abs(theOutParticle.getSuccess()) == 2;
+      t_propoldX  = t_propold ? theOutParticle.vertex().x() : 0.0 ;
+      t_propoldY  = t_propold ? theOutParticle.vertex().y() : 0.0 ; 
+      t_propoldZ  = t_propold ? theOutParticle.vertex().z() : 0.0 ;
+      t_propoldPX = t_propold ? theOutParticle.momentum().x() : 0.0 ;
+      t_propoldPY = t_propold ? theOutParticle.momentum().y() : 0.0 ;
+      t_propoldPZ = t_propold ? theOutParticle.momentum().z() : 0.0 ;
+      t_propoldP  = t_propold ? sqrt(t_propoldPX*t_propoldPX + t_propoldPY*t_propoldPY + t_propoldPZ*t_propoldPZ) : 0.0 ;
+	  tree_track->Fill();
+	}
     
     trackParameters.m_reachesCalorimeter = reachesCalorimeter;
     if (reachesCalorimeter){
@@ -1739,6 +1782,32 @@ void PandoraCMSPFCandProducer::beginJob()
     mytree->Branch("eventno",&eventno);
     mytree->Branch("lumi",&lumi);
     mytree->Branch("nbPFOs",&nbPFOs);
+	
+    tree_track = new TTree("track","track");
+    tree_track->Branch("trackX",        &t_trackX);
+    tree_track->Branch("trackY",        &t_trackY);
+    tree_track->Branch("trackZ",        &t_trackZ);
+    tree_track->Branch("trackPX",       &t_trackPX);
+    tree_track->Branch("trackPY",       &t_trackPY);
+    tree_track->Branch("trackPZ",       &t_trackPZ);
+    tree_track->Branch("trackP",        &t_trackP);
+    tree_track->Branch("propnew",       &t_propnew);
+    tree_track->Branch("propnewX",      &t_propnewX);
+    tree_track->Branch("propnewY",      &t_propnewY);
+    tree_track->Branch("propnewZ",      &t_propnewZ);
+    tree_track->Branch("propnewPX",     &t_propnewPX);
+    tree_track->Branch("propnewPY",     &t_propnewPY);
+    tree_track->Branch("propnewPZ",     &t_propnewPZ);
+    tree_track->Branch("propnewP",      &t_propnewP);
+    tree_track->Branch("propold",       &t_propold);
+    tree_track->Branch("propold_endcap",&t_propold_endcap);
+    tree_track->Branch("propoldX",      &t_propoldX);
+    tree_track->Branch("propoldY",      &t_propoldY);
+    tree_track->Branch("propoldZ",      &t_propoldZ);
+    tree_track->Branch("propoldPX",     &t_propoldPX);
+    tree_track->Branch("propoldPY",     &t_propoldPY);
+    tree_track->Branch("propoldPZ",     &t_propoldPZ);
+    tree_track->Branch("propoldP",      &t_propoldP);
     
     TH1::AddDirectory(oldAddDir); 
     

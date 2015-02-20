@@ -325,6 +325,15 @@ private:
   double first_layer,last_layer,first_layer_match,last_layer_match;
   int runno, eventno, lumi , nbPFOs;
 
+  TTree *tree_track;
+  double t_trackX, t_trackY, t_trackZ;
+  double t_trackPX, t_trackPY, t_trackPZ, t_trackP;
+  double t_propnewX, t_propnewY, t_propnewZ;
+  double t_propnewPX, t_propnewPY, t_propnewPZ, t_propnewP;
+  double t_propoldX, t_propoldY, t_propoldZ;
+  double t_propoldPX, t_propoldPY, t_propoldPZ, t_propoldP;
+  bool t_propnew, t_propold, t_propold_endcap;
+  
   int isDecBefCal;
   double RminVtxDaughter[2];
   double ZminVtxDaughter[2];
